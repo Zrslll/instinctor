@@ -50,6 +50,20 @@ analyze_observations() {
     return
   fi
 
+  # Collect existing instincts for deduplication
+  existing_instincts=""
+  for _idir in "${INSTINCTS_DIR}" "${CONFIG_DIR:-$HOME/.claude/homunculus}/instincts/personal"; do
+    if [ -d "$_idir" ]; then
+      for _if in "$_idir"/*.md "$_idir"/*.yaml "$_idir"/*.yml; do
+        [ -f "$_if" ] || continue
+        _id=$(grep '^id:' "$_if" 2>/dev/null | head -1 | sed 's/^id:[[:space:]]*//')
+        _trigger=$(grep '^trigger:' "$_if" 2>/dev/null | head -1 | sed 's/^trigger:[[:space:]]*//')
+        [ -n "$_id" ] && existing_instincts="${existing_instincts}
+- ${_id}: ${_trigger}"
+      done
+    fi
+  done
+
   prompt_file="$(mktemp "${TMPDIR:-/tmp}/ecc-observer-prompt.XXXXXX")"
   {
     cat <<PROMPT
@@ -84,15 +98,23 @@ project_name: ${PROJECT_NAME}
 - Pattern: <description>
 - Last observed: <date>
 
+=== EXISTING INSTINCTS (DO NOT DUPLICATE) ===${existing_instincts}
+=== END EXISTING INSTINCTS ===
+
 Rules:
+- DEDUPLICATION: Do NOT create an instinct if an existing instinct above covers the same or similar behavior. Check trigger overlap carefully.
+- REPEATABLE PATTERNS ONLY: Only create instincts for behaviors that will repeat in future sessions. Skip one-time actions like "create README", "set up project", "run initial audit", "fix specific bug".
+- Ask yourself: "Will the user do this again next week?" If no — skip it.
 - Be conservative, only clear patterns with 3+ observations
-- Use narrow, specific triggers
+- Use narrow, specific triggers — not vague ("when working with files") but precise ("when reading files larger than 500 lines")
 - Never include actual code snippets, only describe patterns
+- Do NOT create tautological instincts ("use bash for bash operations", "read files before editing")
+- Do NOT create instincts that describe obvious/default tool behavior
 - The YAML frontmatter (between --- markers) with id field is MANDATORY
 - If a pattern seems universal (not project-specific), set scope to global instead of project
 - Examples of global patterns: always validate user input, prefer explicit error handling
 - Examples of project patterns: use React functional components, follow Django REST framework conventions
-- If no clear patterns found, output exactly: NO_PATTERNS_FOUND
+- If no clear NEW patterns found, output exactly: NO_PATTERNS_FOUND
 
 === OBSERVATIONS START ===
 PROMPT
