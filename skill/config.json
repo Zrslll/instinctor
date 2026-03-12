@@ -1,0 +1,12 @@
+{
+  "version": "0.1",
+  "observer": {
+    "enabled": true,
+    "run_interval_minutes": 5,
+    "min_observations_to_analyze": 20
+  },
+  "inject": {
+    "enabled": true,
+    "min_confidence": 0.5
+  }
+}

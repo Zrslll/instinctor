@@ -1,0 +1,22 @@
+# User data (observations, instincts, logs)
+data/
+
+# Injection cache
+.inject-cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
