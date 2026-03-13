@@ -208,7 +208,7 @@ PROMPT
   if [ -f "$OBSERVATIONS_FILE" ]; then
     archive_dir="${PROJECT_DIR}/archive"
     mkdir -p "$archive_dir"
-    mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S).jsonl"
+    mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S).jsonl" || true
     echo "[$(date)] Observations archived to $archive_dir" >> "$LOG_FILE"
   fi
   ANALYZING=0
