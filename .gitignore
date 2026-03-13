@@ -15,6 +15,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# Claude Code local settings (user-specific paths, PIDs)
+.claude/settings.local.json
+
 # IDE
 .idea/
 .vscode/

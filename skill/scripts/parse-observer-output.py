@@ -9,7 +9,7 @@ Env vars:
   PROJECT_NAME_ENV  - project name
   PROJECT_ID_ENV    - project id
   INSTINCTS_DIR     - directory for project-scoped instincts
-  HOMUNCULUS_DIR    - root instinctor directory
+  INSTINCTOR_DIR    - root instinctor directory
 """
 
 import json, sys, os, re, glob
@@ -99,7 +99,7 @@ def main():
 
         # 1. Extract and save instincts from result
         instincts_dir = os.environ.get("INSTINCTS_DIR", "")
-        instinctor_dir = os.environ.get("HOMUNCULUS_DIR", os.path.expanduser("~/.claude/instinctor"))
+        instinctor_dir = os.environ.get("INSTINCTOR_DIR", os.path.expanduser("~/.claude/instinctor"))
         created, updated = 0, 0
         if result and instincts_dir:
             created, updated = extract_and_save_instincts(result, instincts_dir, instinctor_dir)

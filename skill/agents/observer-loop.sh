@@ -7,6 +7,7 @@ unset CLAUDECODE
 SLEEP_PID=""
 USR1_FIRED=0
 ANALYZING=0
+GRACEFUL_EXIT=0
 ACTIVE_CLAUDE_PID=""
 IDLE_CYCLES=0
 MAX_IDLE_CYCLES=6  # exit after 6 empty cycles (~30 min at 5-min interval)
@@ -227,7 +228,6 @@ on_usr1() {
 trap on_usr1 USR1
 
 # Graceful stop: finish current analysis, then exit
-GRACEFUL_EXIT=0
 on_usr2() {
   echo "[$(date)] Graceful stop requested" >> "$LOG_FILE"
   GRACEFUL_EXIT=1
