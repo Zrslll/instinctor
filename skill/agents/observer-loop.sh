@@ -204,12 +204,14 @@ PROMPT
     echo "[$(date)] No new instincts created" >> "$LOG_FILE"
   fi
 
-  # Archive processed observations (Claude read the whole file)
-  if [ -f "$OBSERVATIONS_FILE" ]; then
+  # Archive processed observations only on successful analysis
+  if [ "$exit_code" -eq 0 ] && [ -f "$OBSERVATIONS_FILE" ]; then
     archive_dir="${PROJECT_DIR}/archive"
     mkdir -p "$archive_dir"
     mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S).jsonl" || true
     echo "[$(date)] Observations archived to $archive_dir" >> "$LOG_FILE"
+  elif [ "$exit_code" -ne 0 ]; then
+    echo "[$(date)] Claude failed (exit=$exit_code), keeping observations for retry" >> "$LOG_FILE"
   fi
   ANALYZING=0
 

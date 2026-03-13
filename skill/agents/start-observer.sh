@@ -139,14 +139,14 @@ case "${1:-start}" in
     fi
 
     # One-time cleanup: kill old global observer if exists
-    _old_global_pid="${CONFIG_DIR}/.observer.pid"
-    if [ -f "$_old_global_pid" ]; then
-      _gpid=$(cat "$_old_global_pid" 2>/dev/null)
+    _old_global_pid_file="${CONFIG_DIR}/.observer.pid"
+    if [ -f "$_old_global_pid_file" ]; then
+      _gpid=$(cat "$_old_global_pid_file" 2>/dev/null)
       if [ -n "$_gpid" ] && kill -0 "$_gpid" 2>/dev/null; then
         echo "Stopping legacy global observer (PID: $_gpid)..."
         kill "$_gpid" 2>/dev/null || true
       fi
-      rm -f "$_old_global_pid"
+      rm -f "$_old_global_pid_file"
     fi
 
     # Check if already running
