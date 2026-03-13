@@ -19,10 +19,12 @@
 #   3. git repo root path (fallback, machine-specific)
 #   4. "global" (no project context detected)
 
-# Auto-migrate from legacy homunculus directory
+# Auto-migrate from legacy homunculus directory (one-time, atomic on same FS)
 if [ ! -d "${HOME}/.claude/instinctor" ] && [ -d "${HOME}/.claude/homunculus" ]; then
   mv "${HOME}/.claude/homunculus" "${HOME}/.claude/instinctor" 2>/dev/null || true
 fi
+# Ensure directory exists even if migration failed or was raced
+mkdir -p "${HOME}/.claude/instinctor" 2>/dev/null || true
 
 _CLV2_HOMUNCULUS_DIR="${HOME}/.claude/instinctor"
 _CLV2_PROJECTS_DIR="${_CLV2_HOMUNCULUS_DIR}/projects"
