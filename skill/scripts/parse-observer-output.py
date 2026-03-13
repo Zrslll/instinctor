@@ -9,14 +9,14 @@ Env vars:
   PROJECT_NAME_ENV  - project name
   PROJECT_ID_ENV    - project id
   INSTINCTS_DIR     - directory for project-scoped instincts
-  HOMUNCULUS_DIR    - root homunculus directory
+  HOMUNCULUS_DIR    - root instinctor directory
 """
 
 import json, sys, os, re, glob
 from datetime import datetime, timezone
 
 
-def extract_and_save_instincts(result_text, instincts_dir, homunculus_dir):
+def extract_and_save_instincts(result_text, instincts_dir, instinctor_dir):
     """Parse result text, extract instinct blocks, save as .md files."""
     if not result_text or "NO_PATTERNS_FOUND" in result_text:
         return 0, 0
@@ -68,7 +68,7 @@ def extract_and_save_instincts(result_text, instincts_dir, homunculus_dir):
         scope = scope_match.group(1).strip().strip(strip_chars) if scope_match else "project"
 
         if scope == "global":
-            target_dir = os.path.join(homunculus_dir, "instincts", "personal")
+            target_dir = os.path.join(instinctor_dir, "instincts", "personal")
         else:
             target_dir = instincts_dir
 
@@ -99,10 +99,10 @@ def main():
 
         # 1. Extract and save instincts from result
         instincts_dir = os.environ.get("INSTINCTS_DIR", "")
-        homunculus_dir = os.environ.get("HOMUNCULUS_DIR", os.path.expanduser("~/.claude/homunculus"))
+        instinctor_dir = os.environ.get("HOMUNCULUS_DIR", os.path.expanduser("~/.claude/instinctor"))
         created, updated = 0, 0
         if result and instincts_dir:
-            created, updated = extract_and_save_instincts(result, instincts_dir, homunculus_dir)
+            created, updated = extract_and_save_instincts(result, instincts_dir, instinctor_dir)
             print(f"[instincts] Total: {created} created, {updated} updated")
         elif result:
             print(result)
@@ -135,9 +135,9 @@ def main():
         print(f"[tokens] in={in_t} out={out_t} total={in_t+out_t} cost=${cost:.4f}")
 
         # 3. Update global cache for statusLine (sum all projects)
-        homunculus = os.path.expanduser("~/.claude/homunculus")
+        instinctor = os.path.expanduser("~/.claude/instinctor")
         total = 0
-        for sf in glob.glob(os.path.join(homunculus, "projects/*/token-stats.jsonl")):
+        for sf in glob.glob(os.path.join(instinctor, "projects/*/token-stats.jsonl")):
             with open(sf) as fh:
                 for line in fh:
                     line = line.strip()
@@ -148,7 +148,7 @@ def main():
                         total += r.get("input_tokens", 0) + r.get("output_tokens", 0)
                     except (json.JSONDecodeError, KeyError):
                         continue
-        cache_path = os.path.join(homunculus, ".obs-total")
+        cache_path = os.path.join(instinctor, ".obs-total")
         with open(cache_path, "w") as cf:
             cf.write(str(total))
     except Exception as e:

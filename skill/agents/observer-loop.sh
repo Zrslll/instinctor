@@ -6,9 +6,12 @@ unset CLAUDECODE
 
 SLEEP_PID=""
 USR1_FIRED=0
-STATS_FILE="${PROJECT_DIR}/token-stats.jsonl"
+ANALYZING=0
+ACTIVE_CLAUDE_PID=""
+IDLE_CYCLES=0
+MAX_IDLE_CYCLES=6  # exit after 6 empty cycles (~30 min at 5-min interval)
 
-# Resolve python command
+# Resolve python command (needed for auto-promote)
 PYTHON_CMD="${CLV2_PYTHON_CMD:-}"
 if [ -z "$PYTHON_CMD" ]; then
   for _cmd in python3 python; do
@@ -21,6 +24,11 @@ fi
 
 cleanup() {
   [ -n "$SLEEP_PID" ] && kill "$SLEEP_PID" 2>/dev/null
+  # Kill active claude process if running
+  if [ -n "$ACTIVE_CLAUDE_PID" ] && kill -0 "$ACTIVE_CLAUDE_PID" 2>/dev/null; then
+    echo "[$(date)] Cleanup: killing claude process $ACTIVE_CLAUDE_PID" >> "$LOG_FILE"
+    kill "$ACTIVE_CLAUDE_PID" 2>/dev/null || true
+  fi
   if [ -f "$PID_FILE" ] && [ "$(cat "$PID_FILE" 2>/dev/null)" = "$$" ]; then
     rm -f "$PID_FILE"
   fi
@@ -28,31 +36,50 @@ cleanup() {
 }
 trap cleanup TERM INT
 
+# Global concurrency: max parallel claude-observer processes across all projects
+_count_running_claude_observers() {
+  pgrep -f "claude.*--model haiku.*--max-turns" 2>/dev/null | wc -l | tr -d ' '
+}
+MAX_PARALLEL_ANALYSES="${MAX_PARALLEL_ANALYSES:-3}"
+
 analyze_observations() {
   if [ ! -f "$OBSERVATIONS_FILE" ]; then
-    return
+    return 1  # no file — idle
   fi
 
   obs_count=$(wc -l < "$OBSERVATIONS_FILE" 2>/dev/null || echo 0)
   if [ "$obs_count" -lt "$MIN_OBSERVATIONS" ]; then
-    return
+    return 1  # signal: nothing to do (for idle tracking)
   fi
+
+  IDLE_CYCLES=0
+  ANALYZING=1
 
   echo "[$(date)] Analyzing $obs_count observations for project ${PROJECT_NAME}..." >> "$LOG_FILE"
 
   if [ "${CLV2_IS_WINDOWS:-false}" = "true" ] && [ "${ECC_OBSERVER_ALLOW_WINDOWS:-false}" != "true" ]; then
     echo "[$(date)] Skipping claude analysis on Windows due to known non-interactive hang issue (#295). Set ECC_OBSERVER_ALLOW_WINDOWS=true to override." >> "$LOG_FILE"
+    ANALYZING=0
     return
   fi
 
   if ! command -v claude >/dev/null 2>&1; then
     echo "[$(date)] claude CLI not found, skipping analysis" >> "$LOG_FILE"
+    ANALYZING=0
+    return
+  fi
+
+  # Global concurrency limit
+  _running=$(_count_running_claude_observers)
+  if [ "$_running" -ge "$MAX_PARALLEL_ANALYSES" ]; then
+    echo "[$(date)] Skipping analysis: $_running claude processes already running (max=$MAX_PARALLEL_ANALYSES)" >> "$LOG_FILE"
+    ANALYZING=0
     return
   fi
 
   # Collect existing instincts for deduplication
   existing_instincts=""
-  for _idir in "${INSTINCTS_DIR}" "${CONFIG_DIR:-$HOME/.claude/homunculus}/instincts/personal"; do
+  for _idir in "${INSTINCTS_DIR}" "${CONFIG_DIR:-$HOME/.claude/instinctor}/instincts/personal"; do
     if [ -d "$_idir" ]; then
       for _if in "$_idir"/*.md "$_idir"/*.yaml "$_idir"/*.yml; do
         [ -f "$_if" ] || continue
@@ -64,18 +91,24 @@ analyze_observations() {
     fi
   done
 
+  # Snapshot instincts before analysis to detect new ones
+  _instincts_before=""
+  if [ -d "$INSTINCTS_DIR" ]; then
+    _instincts_before=$(ls "$INSTINCTS_DIR"/*.md 2>/dev/null | sort)
+  fi
+
   prompt_file="$(mktemp "${TMPDIR:-/tmp}/ecc-observer-prompt.XXXXXX")"
-  {
-    cat <<PROMPT
-You are an observation analyzer. You receive session observations as text below and must output instinct definitions directly.
+  cat > "$prompt_file" <<PROMPT
+You are an observation analyzer for the project "${PROJECT_NAME}" (id: ${PROJECT_ID}).
 
-Analyze the following observations for the project "${PROJECT_NAME}" and identify patterns (user corrections, error resolutions, repeated workflows, tool preferences).
-If you find 3+ occurrences of the same pattern, output each instinct using the format below.
+Your task:
+1. Read the ENTIRE observations file in ONE call (no offset/limit): ${OBSERVATIONS_FILE}
+2. Identify repeating patterns (user corrections, error resolutions, repeated workflows, tool preferences)
+3. If you find 3+ occurrences of the same pattern, create an instinct file in ${INSTINCTS_DIR}/
 
-All observations are provided in this prompt text. Do not request any file access.
-Separate each instinct with a line containing only: ===INSTINCT_SEPARATOR===
+IMPORTANT: Read the whole file at once. Do NOT use offset or limit parameters. Do NOT read it in chunks.
 
-Each instinct MUST use this exact format (YAML frontmatter + markdown body):
+Each instinct file must be named <id>.md and use this exact format:
 
 ---
 id: kebab-case-name
@@ -112,68 +145,74 @@ Rules:
 - Do NOT create instincts that describe obvious/default tool behavior
 - The YAML frontmatter (between --- markers) with id field is MANDATORY
 - If a pattern seems universal (not project-specific), set scope to global instead of project
-- Examples of global patterns: always validate user input, prefer explicit error handling
-- Examples of project patterns: use React functional components, follow Django REST framework conventions
-- If no clear NEW patterns found, output exactly: NO_PATTERNS_FOUND
-
-=== OBSERVATIONS START ===
+- If no clear NEW patterns found, do NOT create any files. Just say: NO_PATTERNS_FOUND
 PROMPT
-    cat "$OBSERVATIONS_FILE"
-    echo ""
-    echo "=== OBSERVATIONS END ==="
-  } > "$prompt_file"
 
-  timeout_seconds="${ECC_OBSERVER_TIMEOUT_SECONDS:-120}"
+  timeout_seconds="${ECC_OBSERVER_TIMEOUT_SECONDS:-300}"
   exit_code=0
-  output_file="$(mktemp "${TMPDIR:-/tmp}/ecc-observer-output.XXXXXX")"
 
-  claude -p --model haiku --max-turns 1 --output-format json --tools "" < "$prompt_file" > "$output_file" 2>>"$LOG_FILE" &
-  claude_pid=$!
+  claude --print --model haiku --max-turns 20 \
+    --allowedTools "Read,Write,Glob" \
+    --permission-mode bypassPermissions \
+    < "$prompt_file" >> "$LOG_FILE" 2>&1 &
+  ACTIVE_CLAUDE_PID=$!
 
   (
     sleep "$timeout_seconds"
-    if kill -0 "$claude_pid" 2>/dev/null; then
+    if kill -0 "$ACTIVE_CLAUDE_PID" 2>/dev/null; then
       echo "[$(date)] Claude analysis timed out after ${timeout_seconds}s; terminating process" >> "$LOG_FILE"
-      kill "$claude_pid" 2>/dev/null || true
+      kill "$ACTIVE_CLAUDE_PID" 2>/dev/null || true
     fi
   ) &
   watchdog_pid=$!
 
-  wait "$claude_pid"
+  wait "$ACTIVE_CLAUDE_PID"
   exit_code=$?
+  ACTIVE_CLAUDE_PID=""
   kill "$watchdog_pid" 2>/dev/null || true
   rm -f "$prompt_file"
 
-  echo "[$(date)] Claude finished (exit=$exit_code, output_size=$(wc -c < "$output_file" 2>/dev/null || echo 0))" >> "$LOG_FILE"
-  if [ "$exit_code" -eq 0 ] && [ -s "$output_file" ] && [ -n "$PYTHON_CMD" ]; then
-    # Parse JSON output: extract instincts + write token stats
-    PARSE_SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/scripts/parse-observer-output.py"
-    PROMOTE_SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/scripts/instinct-cli.py"
-    echo "[$(date)] Running parser: $PYTHON_CMD $PARSE_SCRIPT" >> "$LOG_FILE"
-    parse_output=$(STATS_FILE="$STATS_FILE" \
-    OBS_COUNT="$obs_count" \
-    PROJECT_NAME_ENV="$PROJECT_NAME" \
-    PROJECT_ID_ENV="$PROJECT_ID" \
-    INSTINCTS_DIR="$INSTINCTS_DIR" \
-    HOMUNCULUS_DIR="${CONFIG_DIR:-$HOME/.claude/homunculus}" \
-    "$PYTHON_CMD" "$PARSE_SCRIPT" < "$output_file" 2>&1)
-    echo "$parse_output" >> "$LOG_FILE"
+  echo "[$(date)] Claude finished (exit=$exit_code)" >> "$LOG_FILE"
 
-    # Auto-promote if new instincts were created
-    if echo "$parse_output" | grep -qi "created"; then
-      echo "[$(date)] New instincts created, running auto-promote..." >> "$LOG_FILE"
+  # Check if new instinct files appeared
+  _instincts_after=""
+  if [ -d "$INSTINCTS_DIR" ]; then
+    _instincts_after=$(ls "$INSTINCTS_DIR"/*.md 2>/dev/null | sort)
+  fi
+
+  _new_instincts=$(comm -13 <(echo "$_instincts_before") <(echo "$_instincts_after") 2>/dev/null | grep -v '^$')
+  _new_count=0
+  if [ -n "$_new_instincts" ]; then
+    _new_count=$(echo "$_new_instincts" | wc -l | tr -d ' ')
+  fi
+
+  if [ "$_new_count" -gt 0 ]; then
+    echo "[$(date)] Claude created $_new_count new instinct(s):" >> "$LOG_FILE"
+    echo "$_new_instincts" >> "$LOG_FILE"
+
+    # Auto-promote new instincts
+    PROMOTE_SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/scripts/instinct-cli.py"
+    if [ -n "$PYTHON_CMD" ] && [ -f "$PROMOTE_SCRIPT" ]; then
+      echo "[$(date)] Running auto-promote..." >> "$LOG_FILE"
       CLAUDE_PROJECT_DIR="${PROJECT_ROOT:-}" "$PYTHON_CMD" "$PROMOTE_SCRIPT" promote --force >> "$LOG_FILE" 2>&1 || true
     fi
   else
-    echo "[$(date)] Claude analysis failed (exit=$exit_code, python=$PYTHON_CMD)" >> "$LOG_FILE"
+    echo "[$(date)] No new instincts created" >> "$LOG_FILE"
   fi
 
-  rm -f "$output_file"
-
+  # Archive processed observations (Claude read the whole file)
   if [ -f "$OBSERVATIONS_FILE" ]; then
-    archive_dir="${PROJECT_DIR}/observations.archive"
+    archive_dir="${PROJECT_DIR}/archive"
     mkdir -p "$archive_dir"
-    mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S)-$$.jsonl" 2>/dev/null || true
+    mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S).jsonl"
+    echo "[$(date)] Observations archived to $archive_dir" >> "$LOG_FILE"
+  fi
+  ANALYZING=0
+
+  # Exit if graceful stop was requested during analysis
+  if [ "$GRACEFUL_EXIT" -eq 1 ]; then
+    echo "[$(date)] Graceful stop: analysis complete, exiting" >> "$LOG_FILE"
+    cleanup
   fi
 }
 
@@ -181,9 +220,24 @@ on_usr1() {
   [ -n "$SLEEP_PID" ] && kill "$SLEEP_PID" 2>/dev/null
   SLEEP_PID=""
   USR1_FIRED=1
-  analyze_observations
+  if [ "$ANALYZING" -eq 0 ]; then
+    analyze_observations
+  fi
 }
 trap on_usr1 USR1
+
+# Graceful stop: finish current analysis, then exit
+GRACEFUL_EXIT=0
+on_usr2() {
+  echo "[$(date)] Graceful stop requested" >> "$LOG_FILE"
+  GRACEFUL_EXIT=1
+  # If not analyzing, exit immediately
+  if [ "$ANALYZING" -eq 0 ]; then
+    cleanup
+  fi
+  # Otherwise, will exit after analyze_observations completes
+}
+trap on_usr2 USR2
 
 echo "$$" > "$PID_FILE"
 echo "[$(date)] Observer started for ${PROJECT_NAME} (PID: $$)" >> "$LOG_FILE"
@@ -197,6 +251,16 @@ while true; do
   if [ "$USR1_FIRED" -eq 1 ]; then
     USR1_FIRED=0
   else
+    # Single analysis pass — Claude reads the whole file
     analyze_observations
+    _rc=$?
+
+    if [ "$_rc" -eq 1 ]; then
+      IDLE_CYCLES=$((IDLE_CYCLES + 1))
+      if [ "$IDLE_CYCLES" -ge "$MAX_IDLE_CYCLES" ]; then
+        echo "[$(date)] Observer idle for $IDLE_CYCLES cycles, exiting" >> "$LOG_FILE"
+        cleanup
+      fi
+    fi
   fi
 done

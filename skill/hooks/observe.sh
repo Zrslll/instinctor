@@ -89,7 +89,7 @@ PYTHON_CMD="${CLV2_PYTHON_CMD:-$PYTHON_CMD}"
 # Configuration
 # ─────────────────────────────────────────────
 
-CONFIG_DIR="${HOME}/.claude/homunculus"
+CONFIG_DIR="${HOME}/.claude/instinctor"
 # Write observations to project-scoped file (PROJECT_DIR set by detect-project.sh)
 OBSERVATIONS_FILE="${PROJECT_DIR}/observations.jsonl"
 MAX_FILE_SIZE_MB=10
@@ -201,6 +201,31 @@ echo "$PARSED" | "$PYTHON_CMD" -c '
 import json, sys, os, re
 
 parsed = json.load(sys.stdin)
+
+# ── Filter: keep only meaningful events ──
+tool = parsed["tool"]
+event = parsed["event"]
+inp = parsed.get("input") or ""
+out = parsed.get("output") or ""
+
+# Always skip: Read, Grep, Glob, ToolSearch, Shell — routine search/read noise
+if tool in ("Read", "Grep", "Glob", "ToolSearch", "Shell"):
+    sys.exit(0)
+
+# Bash: keep only git commands (tool_start) and errors (tool_complete)
+if tool == "Bash":
+    if event == "tool_start":
+        if "git " not in inp:
+            sys.exit(0)
+    if event == "tool_complete":
+        if not any(w in out.lower() for w in ("error", "fatal", "failed", "exception", "traceback")):
+            sys.exit(0)
+
+# Agent complete: output too large, not useful for patterns
+if tool == "Agent" and event == "tool_complete":
+    sys.exit(0)
+
+# ── Build observation ──
 observation = {
     "timestamp": os.environ["TIMESTAMP"],
     "event": parsed["event"],
@@ -232,18 +257,10 @@ if parsed["output"] is not None:
 print(json.dumps(observation))
 ' >> "$OBSERVATIONS_FILE"
 
-# Signal observer if running
-_pid_file="${CONFIG_DIR}/.observer.pid"
-if [ -f "$_pid_file" ]; then
-  _obs_pid=$(cat "$_pid_file" 2>/dev/null)
-  if [ -n "$_obs_pid" ] && kill -0 "$_obs_pid" 2>/dev/null; then
-    kill -USR1 "$_obs_pid" 2>/dev/null || true
-  fi
-fi
-
-# Auto-start observer if not running
+# Auto-start observer if not running (observer processes observations on its own timer)
+_pid_file="${PROJECT_DIR}/.observer.pid"
 if [ ! -f "$_pid_file" ] || ! kill -0 "$(cat "$_pid_file" 2>/dev/null)" 2>/dev/null; then
-  _throttle="${CONFIG_DIR}/.observer-autostart-throttle"
+  _throttle="${PROJECT_DIR}/.observer-autostart-throttle"
   if [ ! -f "$_throttle" ] || [ -n "$(find "$_throttle" -mmin +5 2>/dev/null)" ]; then
     touch "$_throttle" 2>/dev/null || true
     CLAUDE_PROJECT_DIR="${PROJECT_ROOT}" bash "${SKILL_ROOT}/agents/start-observer.sh" start >/dev/null 2>&1 &

@@ -31,7 +31,7 @@ from typing import Optional
 # Configuration
 # ─────────────────────────────────────────────
 
-HOMUNCULUS_DIR = Path.home() / ".claude" / "homunculus"
+HOMUNCULUS_DIR = Path.home() / ".claude" / "instinctor"
 PROJECTS_DIR = HOMUNCULUS_DIR / "projects"
 REGISTRY_FILE = HOMUNCULUS_DIR / "projects.json"
 

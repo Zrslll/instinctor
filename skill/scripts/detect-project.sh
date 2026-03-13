@@ -8,7 +8,7 @@
 #   _CLV2_PROJECT_ID     - Short hash identifying the project (or "global")
 #   _CLV2_PROJECT_NAME   - Human-readable project name
 #   _CLV2_PROJECT_ROOT   - Absolute path to project root
-#   _CLV2_PROJECT_DIR    - Project-scoped storage directory under homunculus
+#   _CLV2_PROJECT_DIR    - Project-scoped storage directory under instinctor
 #
 # Also sets unprefixed convenience aliases:
 #   PROJECT_ID, PROJECT_NAME, PROJECT_ROOT, PROJECT_DIR
@@ -19,7 +19,7 @@
 #   3. git repo root path (fallback, machine-specific)
 #   4. "global" (no project context detected)
 
-_CLV2_HOMUNCULUS_DIR="${HOME}/.claude/homunculus"
+_CLV2_HOMUNCULUS_DIR="${HOME}/.claude/instinctor"
 _CLV2_PROJECTS_DIR="${_CLV2_HOMUNCULUS_DIR}/projects"
 _CLV2_REGISTRY_FILE="${_CLV2_HOMUNCULUS_DIR}/projects.json"
 

@@ -43,7 +43,7 @@ ln -s "$(pwd)/skill" ~/.claude/skills/continuous-learning-v2
 ### 3. Create data directory
 
 ```bash
-mkdir -p ~/.claude/homunculus/instincts/personal
+mkdir -p ~/.claude/instinctor/instincts/personal
 ```
 
 ### 4. Register hooks in `~/.claude/settings.json`
@@ -98,7 +98,7 @@ mkdir -p ~/.claude/homunculus/instincts/personal
 {
   "statusLine": {
     "type": "command",
-    "command": "input=$(cat); obs=''; if [ -f \"$HOME/.claude/homunculus/.obs-total\" ]; then t=$(cat \"$HOME/.claude/homunculus/.obs-total\" 2>/dev/null); if [ -n \"$t\" ] && [ \"$t\" -gt 0 ] 2>/dev/null; then if [ \"$t\" -ge 1000 ]; then obs=$(awk \"BEGIN{printf \\\" obs:%.1fk\\\", $t/1000}\"); else obs=\" obs:${t}\"; fi; fi; fi; gc=0; pc=0; gd=\"$HOME/.claude/homunculus/instincts/personal\"; if [ -d \"$gd\" ]; then for f in \"$gd\"/*.md \"$gd\"/*.yaml; do [ -f \"$f\" ] && gc=$((gc+1)); done; fi; for pd in \"$HOME/.claude/homunculus/projects\"/*/instincts/personal; do if [ -d \"$pd\" ]; then for f in \"$pd\"/*.md \"$pd\"/*.yaml; do [ -f \"$f\" ] && pc=$((pc+1)); done; fi; done; printf \"instincts:%sg+%sp%s\" \"$gc\" \"$pc\" \"$obs\""
+    "command": "input=$(cat); obs=''; if [ -f \"$HOME/.claude/instinctor/.obs-total\" ]; then t=$(cat \"$HOME/.claude/instinctor/.obs-total\" 2>/dev/null); if [ -n \"$t\" ] && [ \"$t\" -gt 0 ] 2>/dev/null; then if [ \"$t\" -ge 1000 ]; then obs=$(awk \"BEGIN{printf \\\" obs:%.1fk\\\", $t/1000}\"); else obs=\" obs:${t}\"; fi; fi; fi; gc=0; pc=0; gd=\"$HOME/.claude/instinctor/instincts/personal\"; if [ -d \"$gd\" ]; then for f in \"$gd\"/*.md \"$gd\"/*.yaml; do [ -f \"$f\" ] && gc=$((gc+1)); done; fi; for pd in \"$HOME/.claude/instinctor/projects\"/*/instincts/personal; do if [ -d \"$pd\" ]; then for f in \"$pd\"/*.md \"$pd\"/*.yaml; do [ -f \"$f\" ] && pc=$((pc+1)); done; fi; done; printf \"instincts:%sg+%sp%s\" \"$gc\" \"$pc\" \"$obs\""
   }
 }
 ```

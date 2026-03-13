@@ -34,12 +34,12 @@ PYTHON_CMD="${CLV2_PYTHON_CMD:-}"
 # Configuration
 # ─────────────────────────────────────────────
 
-CONFIG_DIR="${HOME}/.claude/homunculus"
+CONFIG_DIR="${HOME}/.claude/instinctor"
 CONFIG_FILE="${SKILL_ROOT}/config.json"
 
 # Use project-scoped paths (detect-project.sh sets PROJECT_DIR)
-PID_FILE="${CONFIG_DIR}/.observer.pid"
-LOG_FILE="${CONFIG_DIR}/observer.log"
+PID_FILE="${PROJECT_DIR}/.observer.pid"
+LOG_FILE="${PROJECT_DIR}/observer.log"
 OBSERVATIONS_FILE="${PROJECT_DIR}/observations.jsonl"
 INSTINCTS_DIR="${PROJECT_DIR}/instincts/personal"
 mkdir -p "$INSTINCTS_DIR"
@@ -95,9 +95,9 @@ case "${1:-start}" in
       pid=$(cat "$PID_FILE")
       if kill -0 "$pid" 2>/dev/null; then
         echo "Stopping observer for ${PROJECT_NAME} (PID: $pid)..."
-        kill "$pid"
-        rm -f "$PID_FILE"
-        echo "Observer stopped."
+        # Graceful stop: USR2 lets observer finish current analysis before exiting
+        kill -USR2 "$pid" 2>/dev/null || kill "$pid" 2>/dev/null
+        echo "Observer graceful stop sent (will exit after current analysis)."
       else
         echo "Observer not running (stale PID file)."
         rm -f "$PID_FILE"
@@ -136,6 +136,17 @@ case "${1:-start}" in
       echo "Observer is disabled in config.json (observer.enabled: false)."
       echo "Set observer.enabled to true in config.json to enable."
       exit 1
+    fi
+
+    # One-time cleanup: kill old global observer if exists
+    _old_global_pid="${CONFIG_DIR}/.observer.pid"
+    if [ -f "$_old_global_pid" ]; then
+      _gpid=$(cat "$_old_global_pid" 2>/dev/null)
+      if [ -n "$_gpid" ] && kill -0 "$_gpid" 2>/dev/null; then
+        echo "Stopping legacy global observer (PID: $_gpid)..."
+        kill "$_gpid" 2>/dev/null || true
+      fi
+      rm -f "$_old_global_pid"
     fi
 
     # Check if already running

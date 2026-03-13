@@ -84,11 +84,11 @@ Validate all user input.
 @pytest.fixture
 def project_tree(tmp_path):
     """Create a realistic project directory tree for testing."""
-    homunculus = tmp_path / ".claude" / "homunculus"
-    projects_dir = homunculus / "projects"
-    global_personal = homunculus / "instincts" / "personal"
-    global_inherited = homunculus / "instincts" / "inherited"
-    global_evolved = homunculus / "evolved"
+    instinctor = tmp_path / ".claude" / "instinctor"
+    projects_dir = instinctor / "projects"
+    global_personal = instinctor / "instincts" / "personal"
+    global_inherited = instinctor / "instincts" / "inherited"
+    global_evolved = instinctor / "evolved"
 
     for d in [
         global_personal, global_inherited,
@@ -99,25 +99,25 @@ def project_tree(tmp_path):
 
     return {
         "root": tmp_path,
-        "homunculus": homunculus,
+        "instinctor": instinctor,
         "projects_dir": projects_dir,
         "global_personal": global_personal,
         "global_inherited": global_inherited,
         "global_evolved": global_evolved,
-        "registry_file": homunculus / "projects.json",
+        "registry_file": instinctor / "projects.json",
     }
 
 
 @pytest.fixture
 def patch_globals(project_tree, monkeypatch):
     """Patch module-level globals to use tmp_path-based directories."""
-    monkeypatch.setattr(_mod, "HOMUNCULUS_DIR", project_tree["homunculus"])
+    monkeypatch.setattr(_mod, "HOMUNCULUS_DIR", project_tree["instinctor"])
     monkeypatch.setattr(_mod, "PROJECTS_DIR", project_tree["projects_dir"])
     monkeypatch.setattr(_mod, "REGISTRY_FILE", project_tree["registry_file"])
     monkeypatch.setattr(_mod, "GLOBAL_PERSONAL_DIR", project_tree["global_personal"])
     monkeypatch.setattr(_mod, "GLOBAL_INHERITED_DIR", project_tree["global_inherited"])
     monkeypatch.setattr(_mod, "GLOBAL_EVOLVED_DIR", project_tree["global_evolved"])
-    monkeypatch.setattr(_mod, "GLOBAL_OBSERVATIONS_FILE", project_tree["homunculus"] / "observations.jsonl")
+    monkeypatch.setattr(_mod, "GLOBAL_OBSERVATIONS_FILE", project_tree["instinctor"] / "observations.jsonl")
     return project_tree
 
 
@@ -549,11 +549,11 @@ def test_load_all_global_only(patch_globals):
         "id": "global",
         "name": "global",
         "root": "",
-        "project_dir": tree["homunculus"],
+        "project_dir": tree["instinctor"],
         "instincts_personal": tree["global_personal"],
         "instincts_inherited": tree["global_inherited"],
         "evolved_dir": tree["global_evolved"],
-        "observations_file": tree["homunculus"] / "observations.jsonl",
+        "observations_file": tree["instinctor"] / "observations.jsonl",
     }
 
     result = load_all_instincts(global_project)
@@ -584,11 +584,11 @@ def test_load_project_only_global_fallback_loads_global(patch_globals):
         "id": "global",
         "name": "global",
         "root": "",
-        "project_dir": tree["homunculus"],
+        "project_dir": tree["instinctor"],
         "instincts_personal": tree["global_personal"],
         "instincts_inherited": tree["global_inherited"],
         "evolved_dir": tree["global_evolved"],
-        "observations_file": tree["homunculus"] / "observations.jsonl",
+        "observations_file": tree["instinctor"] / "observations.jsonl",
     }
 
     result = load_project_only_instincts(global_project)

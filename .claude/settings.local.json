@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for d:*)",
+      "Bash(do echo:*)",
+      "Read(//Users/sirio/StudioProjects/instincts/**)",
+      "Bash(done)",
+      "Bash(cat data/projects/4229c206b086/instincts/*.md 2>/dev/null | head -80)",
+      "Bash(ls /Users/sirio/.claude/instinctor/projects/*/observer.log 2>/dev/null || echo \"no project logs\")",
+      "Bash(ps aux:*)",
+      "Bash(bash -n /Users/sirio/StudioProjects/instincts/skill/agents/observer-loop.sh && echo \"OK\" || echo \"SYNTAX ERROR\")",
+      "Bash(bash -n /Users/sirio/StudioProjects/instincts/skill/agents/start-observer.sh && echo \"OK\" || echo \"SYNTAX ERROR\")",
+      "Bash(kill 27377 27084 2>/dev/null; sleep 1; ps aux | grep observer-loop | grep -v grep || echo \"Все observer'ы остановлены\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''''hooks'''',{}\\), indent=2\\)\\)\")",
+      "Bash(xargs kill:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(for f:*)",
+      "Bash(pkill -f observer-loop 2>/dev/null; echo \"killed old observers\")",
+      "Bash(unset CLAUDECODE && CLAUDE_PROJECT_DIR=~/.claude/instinctor/projects/4229c206b086 bash ~/.claude/skills/continuous-learning-v2/agents/start-observer.sh start 2>&1)",
+      "Bash(kill -USR1 71830 && echo \"USR1 sent, triggering analysis\")",
+      "Bash(cat ~/.claude/instinctor/projects.json 2>/dev/null | python3 -m json.tool)",
+      "Bash(pkill -f observer-loop 2>/dev/null; echo \"killed\")",
+      "Bash(head -1 ~/.claude/instinctor/projects/4229c206b086/observations.jsonl | python3 -m json.tool 2>/dev/null | head -20)",
+      "Bash(unset CLAUDECODE && bash skill/agents/start-observer.sh start 2>&1)",
+      "Bash(kill -USR1 81100 && echo \"USR1 sent\")",
+      "Bash(kill -USR1 83933 && echo \"USR1 sent\")",
+      "Bash(gh api:*)",
+      "Bash(pkill -f observer-loop 2>/dev/null; ls ~/.claude/instinctor/projects/ae36d5cc534e/archive/*.jsonl 2>/dev/null)",
+      "Bash(kill -USR1 90533 && echo \"USR1 sent, waiting...\")",
+      "Bash(pkill -f observer-loop 2>/dev/null; mv ~/.claude/instinctor/projects/ae36d5cc534e/archive/processed-*.jsonl ~/.claude/instinctor/projects/ae36d5cc534e/observations.jsonl 2>/dev/null && wc -l ~/.claude/instinctor/projects/ae36d5cc534e/observations.jsonl)",
+      "Bash(kill -USR1 93206 && echo \"USR1 sent\")",
+      "Bash(head -20 ~/.claude/instinctor/projects/ae36d5cc534e/archive/processed-*.jsonl 2>/dev/null | python3 -c \"\nimport sys, json\nevents = {}\nfor line in sys.stdin:\n    line = line.strip\\(\\)\n    if not line: continue\n    try:\n        d = json.loads\\(line\\)\n        e = d.get\\('event','?'\\)\n        t = d.get\\('tool',''\\)\n        key = f\\\\\"{e}:{t}\\\\\" if t else e\n        events[key] = events.get\\(key, 0\\) + 1\n    except: pass\nfor k,v in sorted\\(events.items\\(\\), key=lambda x:-x[1]\\):\n    print\\(f'{v:>4} {k}'\\)\n\")",
+      "Bash(cat ~/.claude/instinctor/projects/ae36d5cc534e/archive/processed-*.jsonl 2>/dev/null | python3 -c \"\nimport sys, json\nevents = {}\ntotal = 0\nfor line in sys.stdin:\n    line = line.strip\\(\\)\n    if not line: continue\n    total += 1\n    try:\n        d = json.loads\\(line\\)\n        e = d.get\\('event','?'\\)\n        t = d.get\\('tool',''\\)\n        key = f\\\\\"{e}:{t}\\\\\" if t else e\n        events[key] = events.get\\(key, 0\\) + 1\n    except: pass\nprint\\(f'Total: {total}'\\)\nprint\\(\\)\nfor k,v in sorted\\(events.items\\(\\), key=lambda x:-x[1]\\):\n    pct = v*100/total\n    print\\(f'{v:>5} \\({pct:5.1f}%\\) {k}'\\)\n\")",
+      "Bash(cat ~/.claude/instinctor/projects/ae36d5cc534e/archive/processed-*.jsonl 2>/dev/null | python3 -c \"\nimport sys, json\n# Show sample of different event types\nsamples = {}\nfor line in sys.stdin:\n    line = line.strip\\(\\)\n    if not line: continue\n    try:\n        d = json.loads\\(line\\)\n        e = d.get\\('event','?'\\)\n        t = d.get\\('tool',''\\)\n        key = f'{e}:{t}' if t else e\n        if key not in samples:\n            samples[key] = json.dumps\\(d, ensure_ascii=False\\)[:200]\n    except: pass\nfor k in ['tool_complete:Edit', 'tool_complete:Bash', 'tool_complete:Read', 'tool_complete:Grep']:\n    if k in samples:\n        print\\(f'--- {k} ---'\\)\n        print\\(samples[k]\\)\n        print\\(\\)\n\" 2>/dev/null)",
+      "Bash(echo \"=== Global instincts ===\" && ls ~/.claude/instinctor/instincts/personal/ && echo \"=== Projects ===\" && ls ~/.claude/instinctor/projects/ && echo \"=== projects.json ===\" && cat ~/.claude/instinctor/projects.json | python3 -m json.tool)",
+      "Bash(kill 140 2>/dev/null && echo \"Killed old observer PID 140\" || echo \"Already dead\")"
+    ]
+  }
+}
