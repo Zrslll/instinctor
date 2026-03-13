@@ -23,7 +23,10 @@ if [ -z "$PYTHON_CMD" ]; then
   done
 fi
 
+CLEANUP_DONE=0
 cleanup() {
+  [ "$CLEANUP_DONE" -eq 1 ] && return
+  CLEANUP_DONE=1
   [ -n "$SLEEP_PID" ] && kill "$SLEEP_PID" 2>/dev/null
   # Kill active claude process if running
   if [ -n "$ACTIVE_CLAUDE_PID" ] && kill -0 "$ACTIVE_CLAUDE_PID" 2>/dev/null; then
